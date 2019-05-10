@@ -18,13 +18,13 @@ type process struct {
 
 	proc *os.Process
 
-	stopSignal   syscall.Signal
-	canDie       bool
-	canDieNow    bool
-	keepingAlive bool
-	dead         bool
-	interrupted  bool
-	restart      bool
+	stopSignal  syscall.Signal
+	canDie      bool
+	canDieNow   bool
+	wroteExit   bool
+	dead        bool
+	interrupted bool
+	restart     bool
 
 	tmux     *tmuxClient
 	tmuxPane string
@@ -172,13 +172,16 @@ func (p *process) observe() {
 
 	for range ticker.C {
 		if !p.Running() {
-			if !p.keepingAlive {
+			if !p.wroteExit {
 				p.output.WriteBoldLine(p, []byte("Exited"))
-				p.keepingAlive = true
+				p.wroteExit = true
 			}
 
+			if !p.interrupted && p.canDie {
+				p.respawn()
+			}
 			if !p.canDieNow {
-				p.keepingAlive = false
+				p.wroteExit = false
 				p.proc = nil
 
 				if p.restart {
